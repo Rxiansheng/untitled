@@ -62,8 +62,10 @@ def login_youfile(accout, passwd):  # 登陆youfile网盘
         'Referer': 'http://page5.dfpan.com/fs/1l4i4f4e0d6r1e3am3/',
         'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2'
     }
-    r.post('http://www.yunfile.com/view', data=data, headers=headers)
-
+    text = r.post('http://www.yunfile.com/view', data=data, headers=headers)
+    text = etree.HTML(text.text).xpath('//*[@class="safety_code_text"]/text()')
+    if text:
+        return text[0]
 
 def down_file(url_orgin, file_name, vodie_date):  # 下载文件并打印进度条
     make_path(str(vodie_date))
@@ -79,6 +81,8 @@ def down_file(url_orgin, file_name, vodie_date):  # 下载文件并打印进度�
         while True:
             try:
                 text = r.get(url_orgin, headers=headers)
+                # print(text.url)
+                # print(text.text)
                 if text.status_code == 404:
                     break
                 else:
@@ -91,16 +95,23 @@ def down_file(url_orgin, file_name, vodie_date):  # 下载文件并打印进度�
                         'Accept-Language': 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2'
                     }
                     if url:
-                        with closing(r.get(url[-1], stream=True, headers=headers)) as response:
-                            chunk_size = 1024  # 单次请求最大值
-                            content_size = int(response.headers['content-length'])  # 内容体总大小
-                            progress = ProgressBar(file_name, total=content_size,
-                                                   unit="KB", chunk_size=chunk_size, run_status="正在下载",
-                                                   fin_status="下载完成")
-                            with open(str(vodie_date) + '/' + str(file_name) + '.rar', "wb") as file:
-                                for data in response.iter_content(chunk_size=chunk_size):
-                                    file.write(data)
-                                    progress.refresh(count=len(data))
+                        for i in reversed(url):
+                            try:
+                                with closing(r.get(i, stream=True, headers=headers)) as response:
+                                    if response.headers['content-length']:
+                                        chunk_size = 1024  # 单次请求最大值
+                                        content_size = int(response.headers['content-length'])  # 内容体总大小
+                                        progress = ProgressBar(file_name, total=content_size,
+                                                               unit="KB", chunk_size=chunk_size, run_status="正在下载",
+                                                               fin_status="下载完成")
+                                        with open(str(vodie_date) + '/' + str(file_name) + '.rar', "wb") as file:
+                                            for data in response.iter_content(chunk_size=chunk_size):
+                                                file.write(data)
+                                                progress.refresh(count=len(data))
+                                break
+                            except BaseException as e:
+                                print('下载地址失效，换地址下载')
+
                         break
             except BaseException as e:
                 print(e)
@@ -140,7 +151,12 @@ def main(argv):  # 获取脚本输入参数
             accout = arg
         elif opt in ("-p", "--passwd"):  #判断并获取youfile密码
             passwd = arg
-    login_youfile(accout, passwd)
+    login_status = login_youfile(accout, passwd)
+    if login_status == '安全码':
+        print('请手动解封账号')
+        sys.exit(2)
+    else:
+        print('登录成功...准备开始采集')
     for i in range(page_num, 809):
         # print(type)
         text = r.get('http://922tp.com/page/' + str(i))  #获取922tp下载链接

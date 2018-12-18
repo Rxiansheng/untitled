@@ -116,6 +116,11 @@ def make_path(p):
 
 
 def main(argv):  # 获取脚本输入参数
+    if os.path.isfile('page_num.txt'):
+        pass
+    else:
+        with open('page_num.txt','w') as f:
+            f.write('')
     with open('page_num.txt', 'rt') as f:
         page_num = f.read()
         if page_num:
